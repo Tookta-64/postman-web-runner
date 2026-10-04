@@ -1,7 +1,6 @@
 {
   "name": "postman-web-runner",
   "version": "1.0.0",
-  "description": "Web Localhost API Test Runner for Postman Collections",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
