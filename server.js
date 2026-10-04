@@ -291,7 +291,7 @@ app.post('/api/run-test', async (req, res) => {
     }
   }
 
-  return res.json({
+return res.json({
     success: true,
     summary: {
       total: itemNo,
@@ -302,9 +302,6 @@ app.post('/api/run-test', async (req, res) => {
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`==================================================`);
-  console.log(` Web Localhost API Runner is running at:`);
-  console.log(` http://localhost:${PORT}`);
-  console.log(`==================================================`);
+app.listen(process.env.PORT || 3000, '0.0.0.0', () => {
+  console.log(`Server is running on port ${process.env.PORT || 3000}`);
 });
