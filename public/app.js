@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('input', validateForm);
 });
 
-// อ่านไฟล์ Collection และเรนเดอร์ลง UI
+// อ่านไฟล์ Collection แล้วเรนเดอร์ลง UI
 async function handleFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -45,7 +45,7 @@ async function handleFileUpload(e) {
   }
 }
 
-// Render UI สำหรับการตั้งค่าของแต่ละโฟลเดอร์
+// Render UI สำหรับการตั้งค่าของแต่ละโฟลเดอร์ตามภาพออกแบบใหม่
 function renderFolders(folders) {
   const container = document.getElementById('foldersContainer');
   container.innerHTML = '';
@@ -79,50 +79,60 @@ function renderFolders(folders) {
           <h4 class="fw-bold mb-3 text-secondary">{${f.folderName}}</h4>
           
           <div class="group-auth p-3 border rounded-3 mb-3 bg-white">
+            
             <div class="d-flex align-items-center mb-3">
-              <label class="fw-bold form-label mb-0 me-4 text-nowrap">Authentication Type:</label>
-              <div class="form-check me-4">
-                <input class="form-check-input auth-type-radio" type="radio" name="authType_${fIdx}" id="authOAuth_${fIdx}" value="OAUTH" checked onchange="toggleAuthType(${fIdx})">
-                <label class="form-check-label" for="authOAuth_${fIdx}">OAuth 2.0</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input auth-type-radio" type="radio" name="authType_${fIdx}" id="authApiKey_${fIdx}" value="API_KEY" onchange="toggleAuthType(${fIdx})">
-                <label class="form-check-label" for="authApiKey_${fIdx}">API Key</label>
+              <label class="fw-bold form-label mb-0 me-4 text-nowrap" style="width: 160px;">Authentication Type:</label>
+              <div class="d-flex gap-4">
+                <div class="form-check">
+                  <input class="form-check-input auth-type-radio" type="radio" name="authType_${fIdx}" id="authOAuth_${fIdx}" value="OAUTH" checked onchange="toggleAuthType(${fIdx})">
+                  <label class="form-check-label fw-bold" for="authOAuth_${fIdx}">OAuth 2.0</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input auth-type-radio" type="radio" name="authType_${fIdx}" id="authApiKey_${fIdx}" value="API_KEY" onchange="toggleAuthType(${fIdx})">
+                  <label class="form-check-label fw-bold" for="authApiKey_${fIdx}">API Key</label>
+                </div>
               </div>
             </div>
 
-            <div class="d-flex align-items-start mb-3">
+            <div class="d-flex align-items-center mb-3">
+              <label class="fw-bold form-label mb-0 me-4 text-nowrap" style="width: 160px;"></label>
               <div id="oauthSection_${fIdx}" class="flex-grow-1 oauth-inputs">
                 <div class="row g-2">
                   <div class="col-sm-6">
-                    <input type="text" class="form-control form-control-sm client-id" placeholder="Client ID" title="Client ID สำหรับ OAuth 2.0">
+                    <input type="text" class="form-control form-control-sm client-id" placeholder="Client ID">
                   </div>
                   <div class="col-sm-6">
-                    <input type="password" class="form-control form-control-sm client-secret" placeholder="Client Secret" title="Client Secret สำหรับ OAuth 2.0">
+                    <input type="password" class="form-control form-control-sm client-secret" placeholder="Client Secret">
                   </div>
                 </div>
               </div>
-              <div class="px-2 text-secondary fw-bold align-self-center fs-5">+</div>
-              <div id="apiKeySection_${fIdx}" class="apikey-input">
-                <input type="text" class="form-control form-control-sm api-key" placeholder="API Key" title="API Key" disabled style="background-color: #e9ecef; width: 220px;">
+            </div>
+
+            <div class="d-flex align-items-center mb-3">
+              <label class="fw-bold form-label mb-0 me-4 text-nowrap" style="width: 160px;">API Key:</label>
+              <div id="apiKeySection_${fIdx}" class="flex-grow-1 apikey-input">
+                <input type="text" class="form-control form-control-sm api-key" placeholder="API Key" disabled style="background-color: #e9ecef;">
               </div>
             </div>
 
-            <div id="get-token-location-row-${fIdx}" class="d-flex align-items-center mt-2 pt-2 border-top">
-              <label class="fw-bold form-label mb-0 me-4 text-nowrap">Get Token Location:</label>
-              <div class="form-check me-3">
-                <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenPrem_${fIdx}" value="On-Premise">
-                <label class="form-check-label" for="tokenPrem_${fIdx}">On-Premise</label>
-              </div>
-              <div class="form-check me-3">
-                <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenCloud_${fIdx}" value="On-Cloud">
-                <label class="form-check-label" for="tokenCloud_${fIdx}">On-Cloud</label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenAlloy_${fIdx}" value="Cloud Alloy">
-                <label class="form-check-label" for="tokenAlloy_${fIdx}">Cloud Alloy</label>
+            <div id="location-authen-row-${fIdx}" class="d-flex align-items-center mt-2 pt-2 border-top">
+              <label class="fw-bold form-label mb-0 me-4 text-nowrap" style="width: 160px;">Location Authen:</label>
+              <div class="d-flex gap-4">
+                <div class="form-check">
+                  <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenPrem_${fIdx}" value="On-Premise">
+                  <label class="form-check-label" for="tokenPrem_${fIdx}">On-Premise</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenCloud_${fIdx}" value="On-Cloud">
+                  <label class="form-check-label" for="tokenCloud_${fIdx}">On-Cloud</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenAlloy_${fIdx}" value="Cloud Alloy">
+                  <label class="form-check-label" for="tokenAlloy_${fIdx}">Cloud Alloy</label>
+                </div>
               </div>
             </div>
+
           </div>
 
           <div class="table-responsive">
@@ -168,7 +178,7 @@ function renderFolders(folders) {
   validateForm();
 }
 
-// Toggle Auth Type Selection
+// สลับโหมด Enabled / Disabled ระหว่าง OAuth 2.0 กับ API Key
 function toggleAuthType(fIdx) {
   const card = document.querySelector(`.folder-card[data-fidx="${fIdx}"]`);
   const authType = card.querySelector(`input[name="authType_${fIdx}"]:checked`).value;
@@ -176,11 +186,9 @@ function toggleAuthType(fIdx) {
   const clientId = card.querySelector('.client-id');
   const clientSecret = card.querySelector('.client-secret');
   const apiKey = card.querySelector('.api-key');
-  
-  const tokenLocRow = card.querySelector(`#get-token-location-row-${fIdx}`);
-  const tokenLocs = tokenLocRow.querySelectorAll('.token-loc');
 
   if (authType === 'OAUTH') {
+    // เปิด OAuth / ปิด API Key
     clientId.disabled = false;
     clientSecret.disabled = false;
     clientId.style.backgroundColor = '';
@@ -190,10 +198,8 @@ function toggleAuthType(fIdx) {
     apiKey.value = '';
     apiKey.style.backgroundColor = '#e9ecef';
 
-    tokenLocRow.classList.remove('text-muted');
-    tokenLocs.forEach(radio => radio.disabled = false);
-
   } else if (authType === 'API_KEY') {
+    // ปิด OAuth / เปิด API Key
     clientId.disabled = true;
     clientSecret.disabled = true;
     clientId.value = '';
@@ -203,14 +209,9 @@ function toggleAuthType(fIdx) {
 
     apiKey.disabled = false;
     apiKey.style.backgroundColor = '';
-
-    tokenLocRow.classList.add('text-muted');
-    tokenLocs.forEach(radio => {
-      radio.disabled = true;
-      radio.checked = false;
-    });
   }
 
+  // Location Authen เปิดให้เลือกได้ตลอดทั้งสองโหมด
   validateForm();
 }
 
@@ -241,16 +242,21 @@ function validateForm() {
       const authTypeRadio = card.querySelector(`.auth-type-radio:checked`);
       const authType = authTypeRadio ? authTypeRadio.value : 'OAUTH';
 
+      // ต้องเลือก Location Authen เสมอ
+      const tokenLoc = card.querySelector(`.token-loc:checked`);
+      if (!tokenLoc) isAllValid = false;
+
+      // ตรวจสอบค่าใน Input
       if (authType === 'OAUTH') {
         const cId = card.querySelector('.client-id').value.trim();
         const cSec = card.querySelector('.client-secret').value.trim();
-        const tokenLoc = card.querySelector(`.token-loc:checked`);
-        if (!cId || !cSec || !tokenLoc) isAllValid = false;
+        if (!cId || !cSec) isAllValid = false;
       } else if (authType === 'API_KEY') {
         const apiKeyVal = card.querySelector('.api-key').value.trim();
         if (!apiKeyVal) isAllValid = false;
       }
 
+      // ตรวจสอบ Location สำหรับ Request ทุกตัวใน Folder
       const reqCount = folderData[fIdx].requests.length;
       for (let rIdx = 0; rIdx < reqCount; rIdx++) {
         const reqLoc = document.querySelector(`input[name="reqLoc_${fIdx}_${rIdx}"]:checked`);
@@ -305,7 +311,7 @@ async function startExecution() {
       authType: authType,
       clientId: authType === 'OAUTH' ? card.querySelector('.client-id').value.trim() : '',
       clientSecret: authType === 'OAUTH' ? card.querySelector('.client-secret').value.trim() : '',
-      tokenLocation: (authType === 'OAUTH' && tokenLocElem) ? tokenLocElem.value : '',
+      tokenLocation: tokenLocElem ? tokenLocElem.value : '',
       apiKey: authType === 'API_KEY' ? card.querySelector('.api-key').value.trim() : '',
       requests: requests
     });
@@ -388,7 +394,7 @@ function renderTerminalLogs(results) {
         </div>
         
         <div class="log-details mt-1 pt-1 small text-muted font-monospace">
-          System: ${r.system || '-'} | Token Location: ${r.locationGetToken || 'API Key'} | API Location: ${r.locationApi || '-'}
+          System: ${r.system || '-'} | Location Authen: ${r.locationGetToken || '-'} | API Location: ${r.locationApi || '-'}
         </div>
 
         <div class="response-preview mt-2">
@@ -408,7 +414,7 @@ function downloadCSV() {
     return;
   }
 
-  const headers = ["No","System","Location GetToken","Location API","Method","Path URI","Status code","response masg","Resolve IP","Domain","cURL"];
+  const headers = ["No","System","Location Authen","Location API","Method","Path URI","Status code","response masg","Resolve IP","Domain","cURL"];
   
   let csvContent = "\uFEFF";
   csvContent += headers.map(h => `"${h}"`).join(",") + "\n";
