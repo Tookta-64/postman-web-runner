@@ -72,7 +72,7 @@ function renderFolders(folders) {
       <div class="card shadow-sm p-4 mb-3 border rounded-3 folder-card" data-fidx="${fIdx}">
         <h4 class="fw-bold mb-3">{${f.folderName}}</h4>
         
-        <!-- Selection Auth Type (OAuth 2.0 Default) -->
+        <!-- Radio Selection Auth Type (OAuth 2.0 เป็น Default) -->
         <div class="row g-3 mb-3 align-items-center">
           <div class="col-md-3">
             <label class="fw-bold form-label mb-0">Authentication Type:</label>
