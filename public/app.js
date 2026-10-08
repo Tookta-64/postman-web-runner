@@ -45,7 +45,7 @@ async function handleFileUpload(e) {
   }
 }
 
-// Render UI สำหรับการตั้งค่าของแต่ละโฟลเดอร์ตามภาพออกแบบใหม่
+// Render UI สำหรับการตั้งค่าของแต่ละโฟลเดอร์
 function renderFolders(folders) {
   const container = document.getElementById('foldersContainer');
   container.innerHTML = '';
@@ -95,7 +95,7 @@ function renderFolders(folders) {
             </div>
 
             <div class="d-flex align-items-center mb-3">
-              <label class="fw-bold form-label mb-0 me-4 text-nowrap" style="width: 160px;"></label>
+              <label class="fw-bold form-label mb-0 me-4 text-nowrap" style="width: 160px;">OAuth 2.0:</label>
               <div id="oauthSection_${fIdx}" class="flex-grow-1 oauth-inputs">
                 <div class="row g-2">
                   <div class="col-sm-6">
