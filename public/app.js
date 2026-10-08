@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('input', validateForm);
 });
 
-// อ่านไฟล์แล้วเรนเดอร์ลง UI ทันทีโดยไม่มี Loading Popup
+// อ่านไฟล์แล้วเรนเดอร์ลง UI
 async function handleFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -44,7 +44,7 @@ async function handleFileUpload(e) {
   }
 }
 
-// Render UI ตามภาพ Structure
+// Render UI รองรับ Auth Type Selection (OAuth 2.0 vs API Key)
 function renderFolders(folders) {
   const container = document.getElementById('foldersContainer');
   container.innerHTML = '';
@@ -72,28 +72,54 @@ function renderFolders(folders) {
       <div class="card shadow-sm p-4 mb-3 border rounded-3 folder-card" data-fidx="${fIdx}">
         <h4 class="fw-bold mb-3">{${f.folderName}}</h4>
         
-        <div class="row g-3 mb-3 bg-light p-2 rounded">
+        <!-- Selection Auth Type (OAuth 2.0 Default) -->
+        <div class="row g-3 mb-3 align-items-center">
+          <div class="col-md-3">
+            <label class="fw-bold form-label mb-0">Authentication Type:</label>
+          </div>
+          <div class="col-md-9 d-flex gap-4">
+            <div class="form-check">
+              <input class="form-check-input auth-type-radio" type="radio" name="authType_${fIdx}" id="authOAuth_${fIdx}" value="OAUTH" checked onchange="toggleAuthType(${fIdx})">
+              <label class="form-check-label fw-bold" for="authOAuth_${fIdx}">OAuth 2.0</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input auth-type-radio" type="radio" name="authType_${fIdx}" id="authApiKey_${fIdx}" value="API_KEY" onchange="toggleAuthType(${fIdx})">
+              <label class="form-check-label fw-bold" for="authApiKey_${fIdx}">API Key</label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inputs สำหรับ OAuth 2.0 -->
+        <div class="row g-3 mb-3 bg-light p-2 rounded align-items-center" id="oauthSection_${fIdx}">
           <div class="col-md-6">
             <input type="text" class="form-control client-id" placeholder="Client ID">
           </div>
           <div class="col-md-6">
             <input type="password" class="form-control client-secret" placeholder="Client Secret">
           </div>
+          <div class="col-12 mt-2">
+            <div class="d-flex align-items-center gap-4">
+              <span class="fw-bold">Get Token Location:</span>
+              <div class="form-check">
+                <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenPrem_${fIdx}" value="On-Premise">
+                <label class="form-check-label fw-bold" for="tokenPrem_${fIdx}">On-Premise</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenCloud_${fIdx}" value="On-Cloud">
+                <label class="form-check-label fw-bold" for="tokenCloud_${fIdx}">On-Cloud</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenAlloy_${fIdx}" value="Cloud Alloy">
+                <label class="form-check-label fw-bold" for="tokenAlloy_${fIdx}">Cloud Alloy</label>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="d-flex align-items-center gap-4">
-          <span class="fw-bold">Get Token Location:</span>
-          <div class="form-check">
-            <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenPrem_${fIdx}" value="On-Premise">
-            <label class="form-check-label fw-bold" for="tokenPrem_${fIdx}">On-Premise</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenCloud_${fIdx}" value="On-Cloud">
-            <label class="form-check-label fw-bold" for="tokenCloud_${fIdx}">On-Cloud</label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenAlloy_${fIdx}" value="Cloud Alloy">
-            <label class="form-check-label fw-bold" for="tokenAlloy_${fIdx}">Cloud Alloy</label>
+        <!-- Input สำหรับ API Key (เริ่มต้นเป็น Disabled สีเทา) -->
+        <div class="row g-3 mb-3 p-2 rounded" id="apiKeySection_${fIdx}">
+          <div class="col-md-12">
+            <input type="text" class="form-control api-key" placeholder="API Key" disabled style="background-color: #e9ecef;">
           </div>
         </div>
       </div>
@@ -138,6 +164,147 @@ function renderFolders(folders) {
       </div>
     `;
   });
+
+  validateForm();
+}
+
+// ฟังก์ชัน Toggle สถานะการกรอกข้อมูลตามประเภท Auth
+function toggleAuthType(fIdx) {
+  const card = document.querySelector(`.folder-card[data-fidx="${fIdx}"]`);
+  const authType = card.querySelector(`input[name="authType_${fIdx}"]:checked`).value;
+  
+  const clientId = card.querySelector('.client-id');
+  const clientSecret = card.querySelector('.client-secret');
+  const tokenLocs = card.querySelectorAll('.token-loc');
+  const apiKey = card.querySelector('.api-key');
+
+  if (authType === 'OAUTH') {
+    // เลือก OAuth 2.0: เปิด OAuth inputs, ปิด API Key
+    clientId.disabled = false;
+    clientSecret.disabled = false;
+    tokenLocs.forEach(radio => radio.disabled = false);
+
+    apiKey.disabled = true;
+    apiKey.value = '';
+    apiKey.style.backgroundColor = '#e9ecef';
+  } else {
+    // เลือก API Key: ปิด OAuth inputs, เปิด API Key
+    clientId.disabled = true;
+    clientSecret.disabled = true;
+    clientId.value = '';
+    clientSecret.value = '';
+    
+    tokenLocs.forEach(radio => {
+      radio.disabled = true;
+      radio.checked = false;
+    });
+
+    apiKey.disabled = false;
+    apiKey.style.backgroundColor = '#ffffff';
+  }
+
+  validateForm();
+}
+
+function selectAllLocation(fIdx, value) {
+  const radios = document.querySelectorAll(`.req-loc-${fIdx}[value="${value}"]`);
+  radios.forEach(r => {
+    r.checked = true;
+  });
+  validateForm();
+}
+
+// Validation ฟอร์มรองรับทั้ง 2 แบบ
+function validateForm() {
+  const envSelected = document.querySelector('.env-radio:checked');
+  if (!envSelected) {
+    document.getElementById('btnSubmit').disabled = true;
+    return;
+  }
+
+  let isAllValid = true;
+  const folderCards = document.querySelectorAll('.folder-card');
+
+  folderCards.forEach((card, fIdx) => {
+    const authTypeRadio = card.querySelector(`.auth-type-radio:checked`);
+    const authType = authTypeRadio ? authTypeRadio.value : 'OAUTH';
+
+    if (authType === 'OAUTH') {
+      const cId = card.querySelector('.client-id').value.trim();
+      const cSec = card.querySelector('.client-secret').value.trim();
+      const tokenLoc = card.querySelector(`.token-loc:checked`);
+      if (!cId || !cSec || !tokenLoc) isAllValid = false;
+    } else if (authType === 'API_KEY') {
+      const apiKeyVal = card.querySelector('.api-key').value.trim();
+      if (!apiKeyVal) isAllValid = false;
+    }
+
+    const reqCount = folderData[fIdx].requests.length;
+    for (let rIdx = 0; rIdx < reqCount; rIdx++) {
+      const reqLoc = document.querySelector(`input[name="reqLoc_${fIdx}_${rIdx}"]:checked`);
+      if (!reqLoc) isAllValid = false;
+    }
+  });
+
+  document.getElementById('btnSubmit').disabled = !isAllValid;
+}
+
+async function startExecution() {
+  confirmModal.hide();
+
+  const env = document.querySelector('.env-radio:checked').value;
+  const folderCards = document.querySelectorAll('.folder-card');
+  const folderConfigs = [];
+
+  folderCards.forEach((card, fIdx) => {
+    const authType = card.querySelector(`.auth-type-radio:checked`).value;
+    const requests = [];
+
+    folderData[fIdx].requests.forEach((r, rIdx) => {
+      const apiLoc = document.querySelector(`input[name="reqLoc_${fIdx}_${rIdx}"]:checked`).value;
+      requests.push({
+        method: r.method,
+        pathUri: r.pathUri,
+        rawItem: r.rawItem,
+        apiLocation: apiLoc
+      });
+    });
+
+    const tokenLocElem = card.querySelector(`.token-loc:checked`);
+
+    folderConfigs.push({
+      folderName: folderData[fIdx].folderName,
+      authType: authType,
+      clientId: authType === 'OAUTH' ? card.querySelector('.client-id').value.trim() : '',
+      clientSecret: authType === 'OAUTH' ? card.querySelector('.client-secret').value.trim() : '',
+      tokenLocation: (authType === 'OAUTH' && tokenLocElem) ? tokenLocElem.value : '',
+      apiKey: authType === 'API_KEY' ? card.querySelector('.api-key').value.trim() : '',
+      requests: requests
+    });
+  });
+
+  try {
+    const res = await fetch('/api/run-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ env, folderConfigs })
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      alert(data.message);
+    } else {
+      executionResults = data.results;
+      document.getElementById('sumTotal').innerText = data.summary.total;
+      document.getElementById('sumSuccess').innerText = data.summary.successCount;
+      document.getElementById('sumError').innerText = data.summary.errorCount;
+      
+      renderTerminalLogs(executionResults);
+      summaryModal.show();
+    }
+  } catch (err) {
+    alert("เกิดข้อผิดพลาดในการเชื่อมต่อโปรเซสทดสอบ");
+  }
 }
 
 function renderTerminalLogs(results) {
@@ -148,7 +315,7 @@ function renderTerminalLogs(results) {
 
   results.forEach((r, idx) => {
     const isSuccess = r.statusCode >= 200 && r.statusCode < 300;
-    const statusColor = isSuccess ? '#198754' : '#dc3545'; // ใช้สี Bootstrap Success/Danger
+    const statusColor = isSuccess ? '#198754' : '#dc3545';
     const statusText = isSuccess ? 'SUCCESS' : 'ERROR';
 
     let rawResponse = r.responseMsg || '';
@@ -156,9 +323,7 @@ function renderTerminalLogs(results) {
     try {
       const parsed = JSON.parse(rawResponse);
       rawResponse = JSON.stringify(parsed, null, 2);
-    } catch (e) {
-      // ไม่ใช่ JSON ใช้ข้อความเดิม
-    }
+    } catch (e) {}
 
     const lines = rawResponse.split('\n');
     let displayResponse = rawResponse;
@@ -183,95 +348,6 @@ function renderTerminalLogs(results) {
 
     container.innerHTML += logHtml;
   });
-}
-
-function selectAllLocation(fIdx, value) {
-  const radios = document.querySelectorAll(`.req-loc-${fIdx}[value="${value}"]`);
-  radios.forEach(r => {
-    r.checked = true;
-  });
-  validateForm();
-}
-
-function validateForm() {
-  const envSelected = document.querySelector('.env-radio:checked');
-  if (!envSelected) {
-    document.getElementById('btnSubmit').disabled = true;
-    return;
-  }
-
-  let isAllValid = true;
-  const folderCards = document.querySelectorAll('.folder-card');
-
-  folderCards.forEach((card, fIdx) => {
-    const cId = card.querySelector('.client-id').value.trim();
-    const cSec = card.querySelector('.client-secret').value.trim();
-    const tokenLoc = card.querySelector(`.token-loc:checked`);
-
-    if (!cId || !cSec || !tokenLoc) isAllValid = false;
-
-    const reqCount = folderData[fIdx].requests.length;
-    for (let rIdx = 0; rIdx < reqCount; rIdx++) {
-      const reqLoc = document.querySelector(`input[name="reqLoc_${fIdx}_${rIdx}"]:checked`);
-      if (!reqLoc) isAllValid = false;
-    }
-  });
-
-  document.getElementById('btnSubmit').disabled = !isAllValid;
-}
-
-async function startExecution() {
-  confirmModal.hide();
-
-  const env = document.querySelector('.env-radio:checked').value;
-  const folderCards = document.querySelectorAll('.folder-card');
-  const folderConfigs = [];
-
-  folderCards.forEach((card, fIdx) => {
-    const requests = [];
-    folderData[fIdx].requests.forEach((r, rIdx) => {
-      const apiLoc = document.querySelector(`input[name="reqLoc_${fIdx}_${rIdx}"]:checked`).value;
-      requests.push({
-        method: r.method,
-        pathUri: r.pathUri,
-        rawItem: r.rawItem,
-        apiLocation: apiLoc
-      });
-    });
-
-    folderConfigs.push({
-      folderName: folderData[fIdx].folderName,
-      clientId: card.querySelector('.client-id').value.trim(),
-      clientSecret: card.querySelector('.client-secret').value.trim(),
-      tokenLocation: card.querySelector(`.token-loc:checked`).value,
-      requests: requests
-    });
-  });
-
-  try {
-    const res = await fetch('/api/run-test', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ env, folderConfigs })
-    });
-    const data = await res.json();
-
-    if (!data.success) {
-      alert(data.message);
-    } else {
-      executionResults = data.results;
-      document.getElementById('sumTotal').innerText = data.summary.total;
-      document.getElementById('sumSuccess').innerText = data.summary.successCount;
-      document.getElementById('sumError').innerText = data.summary.errorCount;
-      
-      // 🟢 เพิ่มบรรทัดนี้ลงไปเพื่อสั่งให้วาด Terminal Log ก่อนสั่ง show() ครับ
-      renderTerminalLogs(executionResults);
-
-      summaryModal.show();
-    }
-  } catch (err) {
-    alert("เกิดข้อผิดพลาดในการเชื่อมต่อโปรเซสทดสอบ");
-  }
 }
 
 function downloadCSV() {

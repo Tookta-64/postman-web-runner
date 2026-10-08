@@ -6,7 +6,6 @@ const https = require('https');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
 
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
@@ -81,6 +80,11 @@ app.post('/api/validate-collection', (req, res) => {
           pathUri = pathUri.replace(/\{\{[^}]+\}\}/g, '1');
           if (!pathUri.startsWith('/')) pathUri = '/' + pathUri;
 
+          // เช็คเฉพาะ Path /auth/v3.2/oauth/token เท่านั้น ไม่นำมาแสดงผลและไม่รัน test
+          if (pathUri.includes('/auth/v3.2/oauth/token')) {
+            continue;
+          }
+
           requests.push({
             id: item.id || Math.random().toString(36).substr(2, 9),
             name: item.name,
@@ -107,10 +111,12 @@ app.post('/api/validate-collection', (req, res) => {
         }
       } else if (topItem.request) {
         const request = extractRequests([topItem]);
-        folderStructure.push({
-          folderName: "Root Requests",
-          requests: request
-        });
+        if (request.length > 0) {
+          folderStructure.push({
+            folderName: "Root Requests",
+            requests: request
+          });
+        }
       }
     }
 
@@ -124,11 +130,10 @@ app.post('/api/validate-collection', (req, res) => {
   }
 });
 
-// Helper Function สำหรับ Request Token (1 ครั้งต่อ 1 โฟลเดอร์)
+// Helper Function สำหรับ Request Token (เฉพาะ OAuth 2.0 ผ่าน /auth/v3.2/oauth/token)
 async function fetchToken(envName, location, clientId, clientSecret) {
   const envGroup = ENV_CONFIG[envName];
   let targetConfig = null;
-  let isAlloy = (location === 'Cloud Alloy');
 
   if (location === 'On-Cloud') {
     targetConfig = envGroup.APIM;
@@ -139,30 +144,20 @@ async function fetchToken(envName, location, clientId, clientSecret) {
   }
 
   try {
-    if (isAlloy) {
-      const tokenUrl = `https://${targetConfig.Domain}/digitalqueue-px/v1/channel/auth/token`;
-      const response = await axios.post(tokenUrl, {
-        clientId: clientId,
-        clientSecret: clientSecret
-      }, {
-        headers: { 'Content-Type': 'application/json' },
-        httpsAgent: httpsAgent,
-        timeout: 10000
-      });
-      if (response.data && response.data.token) return response.data.token;
-    } else {
-      const tokenUrl = `https://${targetConfig.Domain}/auth/v3.2/oauth/token`;
-      const params = new URLSearchParams();
-      params.append('grant_type', 'client_credentials');
-      params.append('client_id', clientId);
-      params.append('client_secret', clientSecret);
+    const tokenUrl = `https://${targetConfig.Domain}/auth/v3.2/oauth/token`;
+    const params = new URLSearchParams();
+    params.append('grant_type', 'client_credentials');
+    params.append('client_id', clientId);
+    params.append('client_secret', clientSecret);
 
-      const response = await axios.post(tokenUrl, params, {
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        httpsAgent: httpsAgent,
-        timeout: 10000
-      });
-      if (response.data && response.data.access_token) return response.data.access_token;
+    const response = await axios.post(tokenUrl, params, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      httpsAgent: httpsAgent,
+      timeout: 10000
+    });
+
+    if (response.data && response.data.access_token) {
+      return response.data.access_token;
     }
   } catch (error) {
     console.error(`Token Fetch Error (${location}):`, error.message);
@@ -179,21 +174,35 @@ app.post('/api/run-test', async (req, res) => {
   let successCount = 0;
   let errorCount = 0;
 
-  // 1. Get Token 1 ครั้งต่อ 1 Folder
+  // 1. จัดการ Authentication ตามประเภท (OAuth2.0 หรือ API Key)
   for (const fConfig of folderConfigs) {
-    const token = await fetchToken(env, fConfig.tokenLocation, fConfig.clientId, fConfig.clientSecret);
-    if (!token) {
-      return res.json({
-        success: false,
-        errorFolder: fConfig.folderName,
-        message: `ไม่สามารถ Get Token ของโฟลเดอร์ "${fConfig.folderName}" ได้ กรุณาตรวจสอบ Client ID / Client Secret`
-      });
+    const authType = fConfig.authType || 'OAUTH';
+
+    if (authType === 'OAUTH') {
+      const token = await fetchToken(env, fConfig.tokenLocation, fConfig.clientId, fConfig.clientSecret);
+      if (!token) {
+        return res.json({
+          success: false,
+          errorFolder: fConfig.folderName,
+          message: `ไม่สามารถ Get Token ของโฟลเดอร์ "${fConfig.folderName}" ได้ กรุณาตรวจสอบ Client ID / Client Secret`
+        });
+      }
+      fConfig.token = token;
+    } else if (authType === 'API_KEY') {
+      if (!fConfig.apiKey) {
+        return res.json({
+          success: false,
+          errorFolder: fConfig.folderName,
+          message: `กรุณากรอก API Key ของโฟลเดอร์ "${fConfig.folderName}"`
+        });
+      }
     }
-    fConfig.token = token; // บันทึก Token เก็บไว้ใช้กับทุก Request ใน Folder นี้
   }
 
-  // 2. ใช้ Token เดียวกันสำหรับ Call API ทุก Request ใน Folder
+  // 2. เรียกใช้งาน API ตามแต่ละ Request
   for (const fConfig of folderConfigs) {
+    const authType = fConfig.authType || 'OAUTH';
+
     for (const reqItem of fConfig.requests) {
       itemNo++;
       const pathUri = reqItem.pathUri;
@@ -221,13 +230,18 @@ app.post('/api/run-test', async (req, res) => {
         const rawReq = reqItem.rawItem ? reqItem.rawItem.request : {};
         
         let headers = {
-          'Authorization': `Bearer ${fConfig.token}`,
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0'
         };
 
+        if (authType === 'OAUTH') {
+          headers['Authorization'] = `Bearer ${fConfig.token}`;
+        } else if (authType === 'API_KEY') {
+          headers['x-api-key'] = fConfig.apiKey;
+        }
+
         if (rawReq.header && Array.isArray(rawReq.header)) {
           rawReq.header.forEach(h => {
-            if (!h.disabled && h.key && h.value && h.key !== 'Host' && h.key !== 'Authorization') {
+            if (!h.disabled && h.key && h.value && h.key !== 'Host' && h.key !== 'Authorization' && h.key !== 'x-api-key') {
               headers[h.key] = h.value;
             }
           });
@@ -277,7 +291,7 @@ app.post('/api/run-test', async (req, res) => {
         results.push({
           no: itemNo,
           system: systemVal + (targetConfig.labelName || ''),
-          locationGetToken: fConfig.tokenLocation,
+          locationGetToken: authType === 'OAUTH' ? fConfig.tokenLocation : 'API Key',
           locationApi: apiLocation + (targetConfig.labelName || ''),
           method: method,
           pathUri: pathUri,
@@ -291,7 +305,7 @@ app.post('/api/run-test', async (req, res) => {
     }
   }
 
-return res.json({
+  return res.json({
     success: true,
     summary: {
       total: itemNo,
