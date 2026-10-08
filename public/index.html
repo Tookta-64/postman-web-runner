@@ -1,11 +1,11 @@
-<script src="app.js?v=2"></script>
 <!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>API Test Runner - Localhost</title>
+  <title>UNIFIED Dynamic POSTMAN API RUNNER</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-light">
@@ -13,101 +13,100 @@
   <div class="container py-4">
     <h2 class="mb-4 text-center text-primary fw-bold">UNIFIED DYNAMIC POSTMAN API RUNNER</h2>
 
-    <!-- Section 1: Upload File -->
-    <div id="uploadSection" class="card shadow-sm p-4 mb-4">
-      <h5 class="card-title mb-3">อัปโหลด Postman Collection File (.json)</h5>
+    <div id="uploadSection" class="card shadow-sm p-4 mb-4 border rounded-3">
+      <h5 class="card-title fw-bold mb-3 text-secondary">1. อัปโหลด Postman Collection File (.json)</h5>
       <input type="file" id="fileInput" class="form-control" accept=".json">
+      <div class="form-text text-muted">เลือกไฟล์ Postman Collection ของคุณเพื่อตั้งค่าและรัน Test</div>
     </div>
 
-    <!-- Section 2: Form Configurations -->
     <div id="configSection" class="d-none">
       
-      <!-- 2.1 Select Environment -->
-      <div class="card shadow-sm p-4 mb-4">
-        <h5 class="card-title mb-3">เลือก Environment (เลือกได้ 1 อย่าง)</h5>
-        <div class="d-flex gap-4">
+      <div class="card shadow-sm p-4 mb-4 border rounded-3">
+        <h5 class="card-title fw-bold mb-3 text-secondary">2. เลือก Environment (เลือกได้ 1 อย่าง)</h5>
+        <div class="d-flex gap-5">
           <div class="form-check">
             <input class="form-check-input env-radio" type="radio" name="envSelect" id="envSIT" value="SIT">
-            <label class="form-check-label" for="envSIT">SIT</label>
+            <label class="form-check-label fw-semibold" for="envSIT">SIT</label>
           </div>
           <div class="form-check">
             <input class="form-check-input env-radio" type="radio" name="envSelect" id="envUAT" value="UAT">
-            <label class="form-check-label" for="envUAT">UAT</label>
+            <label class="form-check-label fw-semibold" for="envUAT">UAT</label>
           </div>
           <div class="form-check">
             <input class="form-check-input env-radio" type="radio" name="envSelect" id="envPRD" value="PRODUCTION">
-            <label class="form-check-label" for="envPRD">PRODUCTION</label>
+            <label class="form-check-label fw-semibold text-danger" for="envPRD">PRODUCTION</label>
           </div>
         </div>
       </div>
 
-      <!-- Dynamic Folders Container -->
       <div id="foldersContainer"></div>
 
-      <!-- Submit Button -->
-      <div class="text-center my-4">
-        <button id="btnSubmit" class="btn btn-primary btn-lg px-5" disabled>Submit & Run Test</button>
+      <div class="text-center my-4 py-3">
+        <button id="btnSubmit" class="btn btn-primary btn-lg px-5 shadow-sm fw-bold" disabled>
+          <i class="bi bi-play-fill"></i> Submit & Run Test
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- Confirm Popup -->
   <div class="modal fade" id="confirmModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
-      <div class="modal-content p-3 text-center">
-        <h5 class="modal-title my-2">ทดสอบ API เลยหรือไม่?</h5>
-        <div class="d-flex justify-content-center gap-3 mt-3">
-          <button type="button" class="btn btn-success px-4" id="btnGo">Lets go!</button>
-          <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">No!</button>
+      <div class="modal-content border-0 shadow-lg p-3">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold">ยืนยันการรัน API Test</h5>
+        </div>
+        <div class="modal-body text-center text-secondary">
+          คุณตั้งค่า Environment และ Location ครบถ้วนแล้วหรือไม่?<br>ระบบจะทำการ Get Token และรัน Test API ทั้งหมดตามที่คุณกำหนด
+        </div>
+        <div class="d-flex justify-content-center gap-3 mt-3 pb-2 pt-1 modal-footer border-0">
+          <button type="button" class="btn btn-success px-5 fw-bold" id="btnGo">Lets go!</button>
+          <button type="button" class="btn btn-secondary px-4 fw-bold" data-bs-dismiss="modal">ไม่!</button>
         </div>
       </div>
     </div>
   </div>
 
-<!-- Summary Modal -->
   <div class="modal fade" id="summaryModal" data-bs-backdrop="static" tabindex="-1">
     <div class="modal-dialog modal-xl modal-dialog-centered">
-      <div class="modal-content">
+      <div class="modal-content border-0 shadow-lg">
         <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title">API Execution Summary Result</h5>
+          <h5 class="modal-title fw-bold">API Execution Summary Result</h5>
         </div>
         <div class="modal-body">
-          <!-- สรุปตัวเลข Total / Success / Error -->
-          <div class="row text-center mb-3">
+          <div class="row text-center mb-4">
             <div class="col-4">
-              <div class="p-2 border rounded bg-light">
-                <h6>Total Cases</h6>
-                <span id="sumTotal" class="h4 fw-bold">0</span>
+              <div class="p-3 border rounded bg-light shadow-sm">
+                <h6 class="fw-bold text-secondary">Total Cases</h6>
+                <span id="sumTotal" class="h3 fw-bold">0</span>
               </div>
             </div>
             <div class="col-4">
-              <div class="p-2 border rounded bg-success-subtle text-success">
-                <h6>Success</h6>
-                <span id="sumSuccess" class="h4 fw-bold">0</span>
+              <div class="p-3 border rounded bg-success-subtle text-success shadow-sm">
+                <h6 class="fw-bold">Success</h6>
+                <span id="sumSuccess" class="h3 fw-bold">0</span>
               </div>
             </div>
             <div class="col-4">
-              <div class="p-2 border rounded bg-danger-subtle text-danger">
-                <h6>Error</h6>
-                <span id="sumError" class="h4 fw-bold">0</span>
+              <div class="p-3 border rounded bg-danger-subtle text-danger shadow-sm">
+                <h6 class="fw-bold">Error</h6>
+                <span id="sumError" class="h3 fw-bold">0</span>
               </div>
             </div>
           </div>
 
-            <!-- Terminal Log View Container (เปลี่ยนเป็นธีมพื้นหลังขาว) -->
-            <div id="terminalLogContainer" class="bg-white border p-3 rounded font-monospace text-dark" style="max-height: 400px; overflow-y: auto; font-size: 0.88rem;">
-            <!-- รายการ Logs จะถูก Render ใส่ที่นี่ -->
-            </div>
+          <div id="terminalLogContainer" class="bg-white border p-3 rounded font-monospace text-dark shadow-inner" style="max-height: 400px; overflow-y: auto; font-size: 0.88rem;"></div>
         </div>
-        <div class="modal-footer">
-          <button type="button" id="btnExportCsv" class="btn btn-success">Export CSV</button>
-          <button type="button" id="btnCloseSummary" class="btn btn-secondary">ปิด</button>
+        <div class="modal-footer border-0 pb-3 gap-2 d-flex justify-content-end">
+          <button type="button" id="btnExportCsv" class="btn btn-success px-4 d-none fw-bold">
+            <i class="bi bi-file-earmark-arrow-down"></i> Export CSV
+          </button>
+          <button type="button" id="btnCloseSummary" class="btn btn-secondary px-4 fw-bold">ปิด</button>
         </div>
       </div>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>
