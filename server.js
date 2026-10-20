@@ -34,7 +34,8 @@ const ENV_CONFIG = {
     APIM: { Name: "APIM Cloud (PRD)", Domain: "digital-service-bus.cloud.ais.th", IP: "20.247.199.19" },
     PREM_SILA: { Name: "API7 SILA (PRD)", Domain: "esb.ais.th", IP: "110.49.132.212" },
     PREM_TLS: { Name: "API7 TLS (PRD)", Domain: "esb.ais.th", IP: "110.49.128.250" },
-    ALLOY: { Name: "Cloud Alloy (PRD)", Domain: "esb-al.ais.th", IP: "134.185.170.151" }
+    ALLOY_DC: { Name: "Cloud Alloy DC (PRD)", Domain: "esb-al.ais.th", IP: "134.185.170.151" },
+    ALLOY_DR: { Name: "Cloud Alloy DR (PRD)", Domain: "esb-al.ais.th", IP: "168.107.143.216" }
   }
 };
 
@@ -138,7 +139,7 @@ async function fetchToken(envName, location, clientId, clientSecret) {
   if (location === 'On-Cloud') {
     targetConfig = envGroup.APIM;
   } else if (location === 'Cloud Alloy') {
-    targetConfig = envGroup.ALLOY;
+    targetConfig = (envName === 'PRODUCTION') ? envGroup.ALLOY_DC : envGroup.ALLOY;
   } else {
     targetConfig = (envName === 'PRODUCTION') ? envGroup.PREM_SILA : envGroup.PREM;
   }
@@ -214,7 +215,12 @@ app.post('/api/run-test', async (req, res) => {
       if (apiLocation === 'On-Cloud') {
         targetConfigs.push(envGroup.APIM);
       } else if (apiLocation === 'Cloud Alloy') {
-        targetConfigs.push(envGroup.ALLOY);
+        if (env === 'PRODUCTION') {
+          targetConfigs.push({ ...envGroup.ALLOY_DC, labelName: ' (DC)' });
+          targetConfigs.push({ ...envGroup.ALLOY_DR, labelName: ' (DR)' });
+        } else {
+          targetConfigs.push(envGroup.ALLOY);
+        }
       } else {
         if (env === 'PRODUCTION') {
           targetConfigs.push({ ...envGroup.PREM_SILA, labelName: ' (SILA)' });
