@@ -54,68 +54,115 @@ app.post('/api/validate-collection', (req, res) => {
 
     const folderStructure = [];
 
-    function extractRequests(items) {
+    // Helper ดึงค่า Parameter จาก Postman Body
+    function extractBodyParam(body, keyName) {
+      if (!body) return "";
+      if (body.mode === 'urlencoded' && Array.isArray(body.urlencoded)) {
+        const found = body.urlencoded.find(p => p.key === keyName);
+        return found ? found.value : "";
+      }
+      if (body.mode === 'formdata' && Array.isArray(body.formdata)) {
+        const found = body.formdata.find(p => p.key === keyName);
+        return found ? found.value : "";
+      }
+      if (body.mode === 'raw' && body.raw) {
+        const match = body.raw.match(new RegExp(`"${keyName}"\\s*:\\s*"([^"]+)"`));
+        return match ? match[1] : "";
+      }
+      return "";
+    }
+
+    // Helper สกัดรายการ Requests และดึง Credentials
+    function processFolderItems(items) {
       let requests = [];
-      for (const item of items) {
-        if (item.item) {
-          requests = requests.concat(extractRequests(item.item));
-        } else if (item.request) {
-          let rawUrl = "";
-          if (typeof item.request === 'string') {
-            rawUrl = item.request;
-          } else if (item.request.url) {
-            if (typeof item.request.url === 'string') {
-              rawUrl = item.request.url;
-            } else if (item.request.url.raw) {
-              rawUrl = item.request.url.raw;
-            } else if (Array.isArray(item.request.url.path)) {
-              rawUrl = "/" + item.request.url.path.join("/");
+      let extractedClientId = "";
+      let extractedClientSecret = "";
+      let extractedApiKey = "";
+
+      function traverse(itemList) {
+        for (const item of itemList) {
+          if (item.item) {
+            traverse(item.item);
+          } else if (item.request) {
+            let rawUrl = "";
+            if (typeof item.request === 'string') {
+              rawUrl = item.request;
+            } else if (item.request.url) {
+              if (typeof item.request.url === 'string') {
+                rawUrl = item.request.url;
+              } else if (item.request.url.raw) {
+                rawUrl = item.request.url.raw;
+              } else if (Array.isArray(item.request.url.path)) {
+                rawUrl = "/" + item.request.url.path.join("/");
+              }
             }
-          }
 
-          let pathUri = rawUrl;
-          const match = rawUrl.match(/https?:\/\/[^\/]+(?<pathQuery>\/.*)/);
-          if (match && match.groups && match.groups.pathQuery) {
-            pathUri = match.groups.pathQuery;
-          }
-          pathUri = pathUri.replace(/\{\{[^}]+\}\}/g, '1');
-          if (!pathUri.startsWith('/')) pathUri = '/' + pathUri;
+            let pathUri = rawUrl;
+            const match = rawUrl.match(/https?:\/\/[^\/]+(?<pathQuery>\/.*)/);
+            if (match && match.groups && match.groups.pathQuery) {
+              pathUri = match.groups.pathQuery;
+            }
+            pathUri = pathUri.replace(/\{\{[^}]+\}\}/g, '1');
+            if (!pathUri.startsWith('/')) pathUri = '/' + pathUri;
 
-          // เช็คเฉพาะ Path /auth/v3.2/oauth/token เท่านั้น ไม่นำมาแสดงผลและไม่รัน test
-          if (pathUri.includes('/auth/v3.2/oauth/token')) {
-            continue;
-          }
+            // ดึง client_id และ client_secret จาก /auth/v3.2/oauth/token
+            if (pathUri.includes('/auth/v3.2/oauth/token')) {
+              if (item.request.body) {
+                const cId = extractBodyParam(item.request.body, 'client_id');
+                const cSec = extractBodyParam(item.request.body, 'client_secret');
+                if (cId) extractedClientId = cId;
+                if (cSec) extractedClientSecret = cSec;
+              }
+              continue; // กรองออก ไม่นำเข้า List Test
+            }
 
-          requests.push({
-            id: item.id || Math.random().toString(36).substr(2, 9),
-            name: item.name,
-            method: (item.request.method || 'GET').toUpperCase(),
-            pathUri: pathUri,
-            rawItem: {
+            // ดึง x-api-key จาก Header ใน Request
+            if (item.request.header && Array.isArray(item.request.header)) {
+              const apiKeyHeader = item.request.header.find(h => h.key && h.key.toLowerCase() === 'x-api-key');
+              if (apiKeyHeader && apiKeyHeader.value) {
+                extractedApiKey = apiKeyHeader.value;
+              }
+            }
+
+            requests.push({
+              id: item.id || Math.random().toString(36).substr(2, 9),
               name: item.name,
-              request: item.request
-            }
-          });
+              method: (item.request.method || 'GET').toUpperCase(),
+              pathUri: pathUri,
+              rawItem: {
+                name: item.name,
+                request: item.request
+              }
+            });
+          }
         }
       }
-      return requests;
+
+      traverse(items);
+      return { requests, extractedClientId, extractedClientSecret, extractedApiKey };
     }
 
     for (const topItem of jsonContent.item) {
       if (topItem.item) {
-        const requests = extractRequests(topItem.item);
+        const { requests, extractedClientId, extractedClientSecret, extractedApiKey } = processFolderItems(topItem.item);
         if (requests.length > 0) {
           folderStructure.push({
             folderName: topItem.name,
+            clientId: extractedClientId,
+            clientSecret: extractedClientSecret,
+            apiKey: extractedApiKey,
             requests: requests
           });
         }
       } else if (topItem.request) {
-        const request = extractRequests([topItem]);
-        if (request.length > 0) {
+        const { requests, extractedClientId, extractedClientSecret, extractedApiKey } = processFolderItems([topItem]);
+        if (requests.length > 0) {
           folderStructure.push({
             folderName: "Root Requests",
-            requests: request
+            clientId: extractedClientId,
+            clientSecret: extractedClientSecret,
+            apiKey: extractedApiKey,
+            requests: requests
           });
         }
       }
