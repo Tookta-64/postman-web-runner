@@ -300,9 +300,15 @@ app.post('/api/run-test', async (req, res) => {
           });
         }
 
-        let dataBody = null;
+      let dataBody = null;
         if (rawReq.body && rawReq.body.mode === 'raw' && rawReq.body.raw) {
-          dataBody = rawReq.body.raw;
+          try {
+            // พยายาม Parse เป็น Object เพื่อให้ Axios ส่งเป็น JSON สมบูรณ์แบบ
+            dataBody = JSON.parse(rawReq.body.raw);
+          } catch (e) {
+            // ถ้า Parse ไม่ได้ให้ใช้ค่าเดิมที่เป็น string
+            dataBody = rawReq.body.raw;
+          }
           if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
         }
 
