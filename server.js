@@ -15,11 +15,14 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(fileUpload());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Bypass SSL Certificate Validation
-const httpsAgent = new https.Agent({  
-  rejectUnauthorized: false,
-  keepAlive: true
-});
+// ฟังก์ชันสร้าง Custom HTTPS Agent ที่ผูก servername (SNI) สำหรับการบังคับ Resolve IP ปลายทาง
+const createCustomHttpsAgent = (domain) => {
+  return new https.Agent({  
+    rejectUnauthorized: false,
+    keepAlive: true,
+    servername: domain // บังคับให้ส่ง SNI เป็น Domain จริง แม้จะยิงไปที่ IP ตรงๆ
+  });
+};
 
 // ตารางการตั้งค่า Environment Mapping
 const ENV_CONFIG = {
@@ -190,7 +193,7 @@ async function fetchToken(envName, location, clientId, clientSecret) {
   }
 
   try {
-    const tokenUrl = `https://${targetConfig.Domain}/auth/v3.2/oauth/token`;
+    const tokenUrl = `https://${targetConfig.IP}/auth/v3.2/oauth/token`;
     const params = new URLSearchParams();
     params.append('grant_type', 'client_credentials');
     params.append('client_id', clientId);
@@ -200,9 +203,10 @@ async function fetchToken(envName, location, clientId, clientSecret) {
       headers: { 
         'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'PostmanRuntime/7.32.3',
-        'Accept': '*/*'
+        'Accept': '*/*',
+        'Host': targetConfig.Domain
       },
-      httpsAgent: httpsAgent,
+      httpsAgent: createCustomHttpsAgent(targetConfig.Domain),
       timeout: 10000
     });
 
@@ -277,16 +281,18 @@ app.post('/api/run-test', async (req, res) => {
       }
 
       for (const targetConfig of targetConfigs) {
-        const fullUrl = `https://${targetConfig.Domain}${pathUri}`;
+        // บังคับเปลี่ยน URL ให้วิ่งไปที่ IP ปลายทางตรงๆ ตามโจทย์ Resolve IP
+        const ipBasedUrl = `https://${targetConfig.IP}${pathUri}`;
         const method = reqItem.method || 'GET';
         const rawReq = reqItem.rawItem ? reqItem.rawItem.request : {};
         
-        // เอา 'Host' ออก เพื่อป้องกัน WAF มองว่าเป็น malformed request / smuggling
+        // กำหนด Headers พร้อมใส่ Host เป็น Domain จริงเพื่อผ่าน WAF
         let headers = {
           'User-Agent': 'PostmanRuntime/7.32.3',
           'Accept': '*/*',
           'Cache-Control': 'no-cache',
           'Postman-Token': crypto.randomUUID(),
+          'Host': targetConfig.Domain, 
           'Accept-Encoding': 'gzip, deflate, br',
           'Connection': 'keep-alive'
         };
@@ -313,7 +319,7 @@ app.post('/api/run-test', async (req, res) => {
         if (method !== 'GET' && rawReq.body && rawReq.body.mode === 'raw' && rawReq.body.raw) {
           if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
           try {
-            // Parse และ Stringify ใหม่เพื่อให้สะอาด ปราศจาก \r\n ที่ WAF มองว่าผิดกฎ CRLF Injection
+            // ทำความสะอาด JSON Body ป้องกัน CRLF Injection / บรรทัดใหม่
             const parsed = JSON.parse(rawReq.body.raw);
             dataBody = JSON.stringify(parsed);
           } catch (e) {
@@ -321,8 +327,10 @@ app.post('/api/run-test', async (req, res) => {
           }
         }
 
-        let curlCmd = `curl '${fullUrl}' -X ${method}`;
-        Object.keys(headers).forEach(k => { curlCmd += ` -H '${k}: ${headers[k]}'`; });
+        let curlCmd = `curl 'https://${targetConfig.Domain}${pathUri}' -X ${method}`;
+        Object.keys(headers).forEach(k => { 
+          if (k !== 'Host') curlCmd += ` -H '${k}: ${headers[k]}'`; 
+        });
         if (dataBody) curlCmd += ` -d '${dataBody}'`;
 
         let statusCode = "000";
@@ -330,9 +338,9 @@ app.post('/api/run-test', async (req, res) => {
 
         const axiosConfig = {
           method: method,
-          url: fullUrl,
+          url: ipBasedUrl, // ยิงเข้า IP ตรงๆ ตามระบบ Resolve IP
           headers: headers,
-          httpsAgent: httpsAgent,
+          httpsAgent: createCustomHttpsAgent(targetConfig.Domain), // ใช้ Agent ที่ใส่ servername ปกป้อง SNI TLS Handshake
           timeout: 15000,
           maxContentLength: Infinity,
           maxBodyLength: Infinity
