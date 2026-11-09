@@ -304,21 +304,15 @@ app.post('/api/run-test', async (req, res) => {
         }
 
         let dataBody = null;
-        let dataBodyStr = "";
         
         if (method !== 'GET' && rawReq.body && rawReq.body.mode === 'raw' && rawReq.body.raw) {
-          dataBodyStr = rawReq.body.raw;
-          try {
-            dataBody = JSON.parse(dataBodyStr);
-          } catch (e) {
-            dataBody = dataBodyStr;
-          }
+          dataBody = rawReq.body.raw;
           if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
         }
 
         let curlCmd = `curl '${fullUrl}' -X ${method}`;
         Object.keys(headers).forEach(k => { curlCmd += ` -H '${k}: ${headers[k]}'`; });
-        if (dataBodyStr) curlCmd += ` -d '${dataBodyStr.replace(/[\r\n]+/g, '')}'`;
+        if (dataBody) curlCmd += ` -d '${dataBody.replace(/[\r\n]+/g, '')}'`;
 
         let statusCode = "000";
         let responseMsg = "";
@@ -333,6 +327,8 @@ app.post('/api/run-test', async (req, res) => {
 
         if (method !== 'GET' && dataBody !== null) {
           axiosConfig.data = dataBody;
+          // ป้องกันไม่ให้ Axios แปลง object ซ้ำซ้อน ส่ง raw string ตรงๆ แบบ Postman
+          axiosConfig.transformRequest = [(data) => data];
         }
 
         try {
