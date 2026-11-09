@@ -281,13 +281,12 @@ app.post('/api/run-test', async (req, res) => {
         const method = reqItem.method || 'GET';
         const rawReq = reqItem.rawItem ? reqItem.rawItem.request : {};
         
-        // จำลอง Headers ของ Postman Runtime แบบ 100%
+        // เอา 'Host' ออก เพื่อป้องกัน WAF มองว่าเป็น malformed request / smuggling
         let headers = {
           'User-Agent': 'PostmanRuntime/7.32.3',
           'Accept': '*/*',
           'Cache-Control': 'no-cache',
           'Postman-Token': crypto.randomUUID(),
-          'Host': targetConfig.Domain,
           'Accept-Encoding': 'gzip, deflate, br',
           'Connection': 'keep-alive'
         };
@@ -300,7 +299,7 @@ app.post('/api/run-test', async (req, res) => {
 
         if (rawReq.header && Array.isArray(rawReq.header)) {
           rawReq.header.forEach(h => {
-            if (!h.disabled && h.key && h.value && h.key !== 'Host' && h.key !== 'Authorization' && h.key !== 'x-api-key') {
+            if (!h.disabled && h.key && h.value && h.key.toLowerCase() !== 'host' && h.key !== 'Authorization' && h.key !== 'x-api-key') {
               if (method === 'GET' && h.key.toLowerCase() === 'content-type') {
                 return;
               }
@@ -312,16 +311,19 @@ app.post('/api/run-test', async (req, res) => {
         let dataBody = null;
         
         if (method !== 'GET' && rawReq.body && rawReq.body.mode === 'raw' && rawReq.body.raw) {
-          // ใช้ raw string ตรงๆ
-          dataBody = rawReq.body.raw;
           if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
-          // ระบุ Content-Length ให้แม่นยำ
-          headers['Content-Length'] = Buffer.byteLength(dataBody, 'utf8');
+          try {
+            // Parse และ Stringify ใหม่เพื่อให้สะอาด ปราศจาก \r\n ที่ WAF มองว่าผิดกฎ CRLF Injection
+            const parsed = JSON.parse(rawReq.body.raw);
+            dataBody = JSON.stringify(parsed);
+          } catch (e) {
+            dataBody = rawReq.body.raw.replace(/[\r\n]+/g, '');
+          }
         }
 
         let curlCmd = `curl '${fullUrl}' -X ${method}`;
         Object.keys(headers).forEach(k => { curlCmd += ` -H '${k}: ${headers[k]}'`; });
-        if (dataBody) curlCmd += ` -d '${dataBody.replace(/[\r\n]+/g, '')}'`;
+        if (dataBody) curlCmd += ` -d '${dataBody}'`;
 
         let statusCode = "000";
         let responseMsg = "";
@@ -333,13 +335,12 @@ app.post('/api/run-test', async (req, res) => {
           httpsAgent: httpsAgent,
           timeout: 15000,
           maxContentLength: Infinity,
-          maxBodyLength: Infinity,
-          // ป้องกันไม่ให้ Axios Re-serialize string
-          transformRequest: [(data) => data]
+          maxBodyLength: Infinity
         };
 
         if (method !== 'GET' && dataBody !== null) {
           axiosConfig.data = dataBody;
+          axiosConfig.transformRequest = [(data) => data];
         }
 
         try {
