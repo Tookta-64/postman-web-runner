@@ -3,7 +3,9 @@ const fileUpload = require('express-fileupload');
 const cors = require('cors');
 const axios = require('axios');
 const https = require('https');
+const http = require('http');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 
@@ -15,7 +17,8 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Bypass SSL Certificate Validation
 const httpsAgent = new https.Agent({  
-  rejectUnauthorized: false
+  rejectUnauthorized: false,
+  keepAlive: true
 });
 
 // ตารางการตั้งค่า Environment Mapping
@@ -194,7 +197,11 @@ async function fetchToken(envName, location, clientId, clientSecret) {
     params.append('client_secret', clientSecret);
 
     const response = await axios.post(tokenUrl, params, {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'PostmanRuntime/7.32.3',
+        'Accept': '*/*'
+      },
       httpsAgent: httpsAgent,
       timeout: 10000
     });
@@ -274,9 +281,13 @@ app.post('/api/run-test', async (req, res) => {
         const method = reqItem.method || 'GET';
         const rawReq = reqItem.rawItem ? reqItem.rawItem.request : {};
         
+        // จำลอง Headers ของ Postman Runtime แบบ 100%
         let headers = {
           'User-Agent': 'PostmanRuntime/7.32.3',
           'Accept': '*/*',
+          'Cache-Control': 'no-cache',
+          'Postman-Token': crypto.randomUUID(),
+          'Host': targetConfig.Domain,
           'Accept-Encoding': 'gzip, deflate, br',
           'Connection': 'keep-alive'
         };
@@ -299,22 +310,18 @@ app.post('/api/run-test', async (req, res) => {
         }
 
         let dataBody = null;
-        let dataBodyStr = "";
         
         if (method !== 'GET' && rawReq.body && rawReq.body.mode === 'raw' && rawReq.body.raw) {
-          dataBodyStr = rawReq.body.raw;
-          try {
-            // แปลงเป็น Object เพื่อให้ Axios ส่งรูปแบบ JSON ที่สะอาดและคำนวณ Content-Length ถูกต้อง
-            dataBody = JSON.parse(dataBodyStr);
-          } catch (e) {
-            dataBody = dataBodyStr;
-          }
+          // ใช้ raw string ตรงๆ
+          dataBody = rawReq.body.raw;
           if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
+          // ระบุ Content-Length ให้แม่นยำ
+          headers['Content-Length'] = Buffer.byteLength(dataBody, 'utf8');
         }
 
         let curlCmd = `curl '${fullUrl}' -X ${method}`;
         Object.keys(headers).forEach(k => { curlCmd += ` -H '${k}: ${headers[k]}'`; });
-        if (dataBodyStr) curlCmd += ` -d '${dataBodyStr.replace(/[\r\n]+/g, '')}'`;
+        if (dataBody) curlCmd += ` -d '${dataBody.replace(/[\r\n]+/g, '')}'`;
 
         let statusCode = "000";
         let responseMsg = "";
@@ -326,11 +333,13 @@ app.post('/api/run-test', async (req, res) => {
           httpsAgent: httpsAgent,
           timeout: 15000,
           maxContentLength: Infinity,
-          maxBodyLength: Infinity
+          maxBodyLength: Infinity,
+          // ป้องกันไม่ให้ Axios Re-serialize string
+          transformRequest: [(data) => data]
         };
 
         if (method !== 'GET' && dataBody !== null) {
-          axiosConfig.data = dataBody; // ส่งเป็น JSON Object ปกติให้ Axios จัดการ serialize
+          axiosConfig.data = dataBody;
         }
 
         try {
