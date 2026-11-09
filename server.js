@@ -54,7 +54,6 @@ app.post('/api/validate-collection', (req, res) => {
 
     const folderStructure = [];
 
-    // Helper ดึงค่า Parameter จาก Postman Body
     function extractBodyParam(body, keyName) {
       if (!body) return "";
       if (body.mode === 'urlencoded' && Array.isArray(body.urlencoded)) {
@@ -72,7 +71,6 @@ app.post('/api/validate-collection', (req, res) => {
       return "";
     }
 
-    // Helper สกัดรายการ Requests และดึง Credentials
     function processFolderItems(items) {
       let requests = [];
       let extractedClientId = "";
@@ -105,7 +103,6 @@ app.post('/api/validate-collection', (req, res) => {
             pathUri = pathUri.replace(/\{\{[^}]+\}\}/g, '1');
             if (!pathUri.startsWith('/')) pathUri = '/' + pathUri;
 
-            // ดึง client_id และ client_secret จาก /auth/v3.2/oauth/token
             if (pathUri.includes('/auth/v3.2/oauth/token')) {
               if (item.request.body) {
                 const cId = extractBodyParam(item.request.body, 'client_id');
@@ -113,10 +110,9 @@ app.post('/api/validate-collection', (req, res) => {
                 if (cId) extractedClientId = cId;
                 if (cSec) extractedClientSecret = cSec;
               }
-              continue; // กรองออก ไม่นำเข้า List Test
+              continue;
             }
 
-            // ดึง x-api-key จาก Header ใน Request
             if (item.request.header && Array.isArray(item.request.header)) {
               const apiKeyHeader = item.request.header.find(h => h.key && h.key.toLowerCase() === 'x-api-key');
               if (apiKeyHeader && apiKeyHeader.value) {
@@ -178,7 +174,6 @@ app.post('/api/validate-collection', (req, res) => {
   }
 });
 
-// Helper Function สำหรับ Request Token (เฉพาะ OAuth 2.0 ผ่าน /auth/v3.2/oauth/token)
 async function fetchToken(envName, location, clientId, clientSecret) {
   const envGroup = ENV_CONFIG[envName];
   let targetConfig = null;
@@ -213,7 +208,6 @@ async function fetchToken(envName, location, clientId, clientSecret) {
   return null;
 }
 
-// API รัน Test
 app.post('/api/run-test', async (req, res) => {
   const { env, folderConfigs } = req.body;
 
@@ -222,7 +216,6 @@ app.post('/api/run-test', async (req, res) => {
   let successCount = 0;
   let errorCount = 0;
 
-  // 1. จัดการ Authentication ตามประเภท (OAuth2.0 หรือ API Key)
   for (const fConfig of folderConfigs) {
     const authType = fConfig.authType || 'OAUTH';
 
@@ -247,7 +240,6 @@ app.post('/api/run-test', async (req, res) => {
     }
   }
 
-  // 2. เรียกใช้งาน API ตามแต่ละ Request
   for (const fConfig of folderConfigs) {
     const authType = fConfig.authType || 'OAUTH';
 
@@ -283,7 +275,10 @@ app.post('/api/run-test', async (req, res) => {
         const rawReq = reqItem.rawItem ? reqItem.rawItem.request : {};
         
         let headers = {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0'
+          'User-Agent': 'PostmanRuntime/7.32.3',
+          'Accept': '*/*',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive'
         };
 
         if (authType === 'OAUTH') {
@@ -296,7 +291,7 @@ app.post('/api/run-test', async (req, res) => {
           rawReq.header.forEach(h => {
             if (!h.disabled && h.key && h.value && h.key !== 'Host' && h.key !== 'Authorization' && h.key !== 'x-api-key') {
               if (method === 'GET' && h.key.toLowerCase() === 'content-type') {
-                return; // ห้ามส่ง Content-Type ใน GET request
+                return;
               }
               headers[h.key] = h.value;
             }
@@ -322,12 +317,13 @@ app.post('/api/run-test', async (req, res) => {
           url: fullUrl,
           headers: headers,
           httpsAgent: httpsAgent,
-          timeout: 15000
+          timeout: 15000,
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
         };
 
         if (method !== 'GET' && dataBody !== null) {
           axiosConfig.data = dataBody;
-          // ป้องกันไม่ให้ Axios แปลง object ซ้ำซ้อน ส่ง raw string ตรงๆ แบบ Postman
           axiosConfig.transformRequest = [(data) => data];
         }
 
