@@ -295,39 +295,48 @@ app.post('/api/run-test', async (req, res) => {
         if (rawReq.header && Array.isArray(rawReq.header)) {
           rawReq.header.forEach(h => {
             if (!h.disabled && h.key && h.value && h.key !== 'Host' && h.key !== 'Authorization' && h.key !== 'x-api-key') {
+              if (method === 'GET' && h.key.toLowerCase() === 'content-type') {
+                return; // ห้ามส่ง Content-Type ใน GET request
+              }
               headers[h.key] = h.value;
             }
           });
         }
 
-      let dataBody = null;
-        if (rawReq.body && rawReq.body.mode === 'raw' && rawReq.body.raw) {
+        let dataBody = null;
+        let dataBodyStr = "";
+        
+        if (method !== 'GET' && rawReq.body && rawReq.body.mode === 'raw' && rawReq.body.raw) {
+          dataBodyStr = rawReq.body.raw;
           try {
-            // พยายาม Parse เป็น Object เพื่อให้ Axios ส่งเป็น JSON สมบูรณ์แบบ
-            dataBody = JSON.parse(rawReq.body.raw);
+            dataBody = JSON.parse(dataBodyStr);
           } catch (e) {
-            // ถ้า Parse ไม่ได้ให้ใช้ค่าเดิมที่เป็น string
-            dataBody = rawReq.body.raw;
+            dataBody = dataBodyStr;
           }
           if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
         }
 
         let curlCmd = `curl '${fullUrl}' -X ${method}`;
         Object.keys(headers).forEach(k => { curlCmd += ` -H '${k}: ${headers[k]}'`; });
-        if (dataBody) curlCmd += ` -d '${dataBody.replace(/[\r\n]+/g, '')}'`;
+        if (dataBodyStr) curlCmd += ` -d '${dataBodyStr.replace(/[\r\n]+/g, '')}'`;
 
         let statusCode = "000";
         let responseMsg = "";
 
+        const axiosConfig = {
+          method: method,
+          url: fullUrl,
+          headers: headers,
+          httpsAgent: httpsAgent,
+          timeout: 15000
+        };
+
+        if (method !== 'GET' && dataBody !== null) {
+          axiosConfig.data = dataBody;
+        }
+
         try {
-          const resp = await axios({
-            method: method,
-            url: fullUrl,
-            headers: headers,
-            data: dataBody,
-            httpsAgent: httpsAgent,
-            timeout: 15000
-          });
+          const resp = await axios(axiosConfig);
           statusCode = resp.status.toString();
           responseMsg = typeof resp.data === 'object' ? JSON.stringify(resp.data) : String(resp.data);
           successCount++;
