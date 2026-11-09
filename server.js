@@ -299,15 +299,22 @@ app.post('/api/run-test', async (req, res) => {
         }
 
         let dataBody = null;
+        let dataBodyStr = "";
         
         if (method !== 'GET' && rawReq.body && rawReq.body.mode === 'raw' && rawReq.body.raw) {
-          dataBody = rawReq.body.raw;
+          dataBodyStr = rawReq.body.raw;
+          try {
+            // แปลงเป็น Object เพื่อให้ Axios ส่งรูปแบบ JSON ที่สะอาดและคำนวณ Content-Length ถูกต้อง
+            dataBody = JSON.parse(dataBodyStr);
+          } catch (e) {
+            dataBody = dataBodyStr;
+          }
           if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
         }
 
         let curlCmd = `curl '${fullUrl}' -X ${method}`;
         Object.keys(headers).forEach(k => { curlCmd += ` -H '${k}: ${headers[k]}'`; });
-        if (dataBody) curlCmd += ` -d '${dataBody.replace(/[\r\n]+/g, '')}'`;
+        if (dataBodyStr) curlCmd += ` -d '${dataBodyStr.replace(/[\r\n]+/g, '')}'`;
 
         let statusCode = "000";
         let responseMsg = "";
@@ -323,8 +330,7 @@ app.post('/api/run-test', async (req, res) => {
         };
 
         if (method !== 'GET' && dataBody !== null) {
-          axiosConfig.data = dataBody;
-          axiosConfig.transformRequest = [(data) => data];
+          axiosConfig.data = dataBody; // ส่งเป็น JSON Object ปกติให้ Axios จัดการ serialize
         }
 
         try {
