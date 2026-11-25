@@ -17,7 +17,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ฟังก์ชันสร้าง Custom HTTPS Agent ที่ผูก servername (SNI) สำหรับการบังคับ Resolve IP ปลายทาง
 const createCustomHttpsAgent = (domain) => {
-  return new https.Agent({  
+  return new https.Agent({
     rejectUnauthorized: false,
     keepAlive: true,
     servername: domain
@@ -44,6 +44,14 @@ const ENV_CONFIG = {
     ALLOY_DR: { Name: "Cloud Alloy DR (PRD)", Domain: "esb-al.ais.th", IP: "168.107.143.216" }
   }
 };
+
+function getEnabledApiKeyFromHeaders(headerList) {
+  if (!Array.isArray(headerList)) return "";
+  const found = headerList.find(
+    h => !h.disabled && h.key && h.key.toLowerCase() === 'x-api-key' && h.value
+  );
+  return found ? String(found.value).trim() : "";
+}
 
 app.post('/api/validate-collection', (req, res) => {
   if (!req.files || !req.files.collection) {
@@ -119,11 +127,9 @@ app.post('/api/validate-collection', (req, res) => {
               continue;
             }
 
-            if (item.request.header && Array.isArray(item.request.header)) {
-              const apiKeyHeader = item.request.header.find(h => h.key && h.key.toLowerCase() === 'x-api-key');
-              if (apiKeyHeader && apiKeyHeader.value) {
-                extractedApiKey = apiKeyHeader.value;
-              }
+            const enabledKey = getEnabledApiKeyFromHeaders(item.request.header);
+            if (enabledKey) {
+              extractedApiKey = enabledKey;
             }
 
             requests.push({
@@ -200,7 +206,7 @@ async function fetchToken(envName, location, clientId, clientSecret) {
     params.append('client_secret', clientSecret);
 
     const response = await axios.post(tokenUrl, params, {
-      headers: { 
+      headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
         'User-Agent': 'PostmanRuntime/7.32.3',
         'Accept': '*/*',
@@ -241,7 +247,11 @@ app.post('/api/run-test', async (req, res) => {
       }
       fConfig.token = token;
     } else if (authType === 'API_KEY') {
-      if (!fConfig.apiKey) {
+      const hasAnyRequestKey = Array.isArray(fConfig.requests) && fConfig.requests.some(r => {
+        const reqHeaders = r.rawItem && r.rawItem.request ? r.rawItem.request.header : null;
+        return Boolean(getEnabledApiKeyFromHeaders(reqHeaders));
+      });
+      if (!fConfig.apiKey && !hasAnyRequestKey) {
         return res.json({
           success: false,
           errorFolder: fConfig.folderName,
@@ -258,7 +268,7 @@ app.post('/api/run-test', async (req, res) => {
       itemNo++;
       const pathUri = reqItem.pathUri;
       const apiLocation = reqItem.apiLocation;
-      
+
       const envGroup = ENV_CONFIG[env];
       let targetConfigs = [];
 
@@ -284,13 +294,13 @@ app.post('/api/run-test', async (req, res) => {
         const ipBasedUrl = `https://${targetConfig.IP}${pathUri}`;
         const method = reqItem.method || 'GET';
         const rawReq = reqItem.rawItem ? reqItem.rawItem.request : {};
-        
+
         let headers = {
           'User-Agent': 'PostmanRuntime/7.32.3',
           'Accept': '*/*',
           'Cache-Control': 'no-cache',
           'Postman-Token': crypto.randomUUID(),
-          'Host': targetConfig.Domain, 
+          'Host': targetConfig.Domain,
           'Accept-Encoding': 'gzip, deflate, br',
           'Connection': 'keep-alive'
         };
@@ -298,13 +308,21 @@ app.post('/api/run-test', async (req, res) => {
         if (authType === 'OAUTH') {
           headers['Authorization'] = `Bearer ${fConfig.token}`;
         } else if (authType === 'API_KEY') {
-          headers['x-api-key'] = fConfig.apiKey;
+          const requestSpecificKey = getEnabledApiKeyFromHeaders(rawReq.header);
+          const resolvedApiKey = requestSpecificKey || fConfig.apiKey;
+          if (resolvedApiKey) {
+            headers['x-api-key'] = resolvedApiKey;
+          }
         }
 
         if (rawReq.header && Array.isArray(rawReq.header)) {
           rawReq.header.forEach(h => {
-            if (!h.disabled && h.key && h.value && h.key.toLowerCase() !== 'host' && h.key !== 'Authorization' && h.key !== 'x-api-key') {
-              if (method === 'GET' && h.key.toLowerCase() === 'content-type') {
+            if (!h.disabled && h.key && h.value) {
+              const keyLower = h.key.toLowerCase();
+              if (keyLower === 'host' || keyLower === 'authorization' || keyLower === 'x-api-key') {
+                return;
+              }
+              if (method === 'GET' && keyLower === 'content-type') {
                 return;
               }
               headers[h.key] = h.value;
@@ -312,13 +330,12 @@ app.post('/api/run-test', async (req, res) => {
           });
         }
 
-        // แนบ Custom Request Header เพิ่มเติมเข้าไปในทุก Request ของ Collection
         if (customHeader && customHeader.name && customHeader.value) {
           headers[customHeader.name] = customHeader.value;
         }
 
         let dataBody = null;
-        
+
         if (method !== 'GET' && rawReq.body && rawReq.body.mode === 'raw' && rawReq.body.raw) {
           if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
           try {
@@ -330,8 +347,8 @@ app.post('/api/run-test', async (req, res) => {
         }
 
         let curlCmd = `curl 'https://${targetConfig.Domain}${pathUri}' -X ${method}`;
-        Object.keys(headers).forEach(k => { 
-          if (k !== 'Host') curlCmd += ` -H '${k}: ${headers[k]}'`; 
+        Object.keys(headers).forEach(k => {
+          if (k !== 'Host') curlCmd += ` -H '${k}: ${headers[k]}'`;
         });
         if (dataBody) curlCmd += ` -d '${dataBody}'`;
 
