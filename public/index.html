@@ -39,6 +39,32 @@
         </div>
       </div>
 
+      <!-- กล่องตั้งค่า Custom Request Header (ระดับทั้ง Collection) -->
+      <div class="card shadow-sm p-4 mb-4 border rounded-3">
+        <div class="d-flex align-items-center flex-wrap gap-4">
+          <h5 class="card-title fw-bold mb-0 text-secondary">ต้องการเพิ่ม request header ?</h5>
+          <div class="d-flex gap-4">
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="radio" name="addCustomHeader" id="customHeaderNo" value="NO" checked onchange="toggleCustomHeader()">
+              <label class="form-check-label fw-semibold" for="customHeaderNo">No</label>
+            </div>
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="radio" name="addCustomHeader" id="customHeaderYes" value="YES" onchange="toggleCustomHeader()">
+              <label class="form-check-label fw-semibold" for="customHeaderYes">Yes</label>
+            </div>
+          </div>
+        </div>
+
+        <div id="customHeaderInputs" class="row g-2 mt-3 d-none">
+          <div class="col-sm-6">
+            <input type="text" class="form-control" id="customHeaderName" placeholder="Header Name (เช่น x-traffic-class)">
+          </div>
+          <div class="col-sm-6">
+            <input type="text" class="form-control" id="customHeaderValue" placeholder="Header Value (เช่น online)">
+          </div>
+        </div>
+      </div>
+
       <div id="foldersContainer"></div>
 
       <div class="text-center my-4 py-3">
@@ -107,6 +133,6 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

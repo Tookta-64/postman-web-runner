@@ -16,6 +16,20 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('input', validateForm);
 });
 
+function toggleCustomHeader() {
+  const isYes = document.getElementById('customHeaderYes')?.checked;
+  const inputContainer = document.getElementById('customHeaderInputs');
+  
+  if (inputContainer) {
+    if (isYes) {
+      inputContainer.classList.remove('d-none');
+    } else {
+      inputContainer.classList.add('d-none');
+    }
+  }
+  validateForm();
+}
+
 async function handleFileUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -36,6 +50,7 @@ async function handleFileUpload(e) {
       folderData = data.data;
       renderFolders(folderData);
       document.getElementById('configSection').classList.remove('d-none');
+      validateForm();
     }
   } catch (err) {
     console.error("Upload and validate error:", err);
@@ -250,6 +265,17 @@ function validateForm() {
     return;
   }
 
+  // ตรวจสอบเงื่อนไข Custom Request Header
+  const isCustomHeaderYes = document.getElementById('customHeaderYes')?.checked;
+  if (isCustomHeaderYes) {
+    const hName = document.getElementById('customHeaderName')?.value.trim();
+    const hVal = document.getElementById('customHeaderValue')?.value.trim();
+    if (!hName || !hVal) {
+      btnSubmit.disabled = true;
+      return;
+    }
+  }
+
   let isAllValid = true;
   const folderCards = document.querySelectorAll('.folder-card');
 
@@ -302,6 +328,17 @@ async function startExecution() {
   summaryFooter.querySelectorAll('button:not(#btnGoToSummary)').forEach(b => b.classList.add('d-none'));
 
   const env = document.querySelector('.env-radio:checked').value;
+  
+  // ดึงค่า Custom Header
+  let customHeader = null;
+  if (document.getElementById('customHeaderYes')?.checked) {
+    const hName = document.getElementById('customHeaderName').value.trim();
+    const hVal = document.getElementById('customHeaderValue').value.trim();
+    if (hName && hVal) {
+      customHeader = { name: hName, value: hVal };
+    }
+  }
+
   const folderCards = document.querySelectorAll('.folder-card');
   const folderConfigs = [];
 
@@ -336,7 +373,7 @@ async function startExecution() {
     const res = await fetch('/api/run-test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ env, folderConfigs })
+      body: JSON.stringify({ env, folderConfigs, customHeader })
     });
     const data = await res.json();
 

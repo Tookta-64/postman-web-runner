@@ -20,7 +20,7 @@ const createCustomHttpsAgent = (domain) => {
   return new https.Agent({  
     rejectUnauthorized: false,
     keepAlive: true,
-    servername: domain // บังคับให้ส่ง SNI เป็น Domain จริง แม้จะยิงไปที่ IP ตรงๆ
+    servername: domain
   });
 };
 
@@ -220,7 +220,7 @@ async function fetchToken(envName, location, clientId, clientSecret) {
 }
 
 app.post('/api/run-test', async (req, res) => {
-  const { env, folderConfigs } = req.body;
+  const { env, folderConfigs, customHeader } = req.body;
 
   const results = [];
   let itemNo = 0;
@@ -281,12 +281,10 @@ app.post('/api/run-test', async (req, res) => {
       }
 
       for (const targetConfig of targetConfigs) {
-        // บังคับเปลี่ยน URL ให้วิ่งไปที่ IP ปลายทางตรงๆ ตามโจทย์ Resolve IP
         const ipBasedUrl = `https://${targetConfig.IP}${pathUri}`;
         const method = reqItem.method || 'GET';
         const rawReq = reqItem.rawItem ? reqItem.rawItem.request : {};
         
-        // กำหนด Headers พร้อมใส่ Host เป็น Domain จริงเพื่อผ่าน WAF
         let headers = {
           'User-Agent': 'PostmanRuntime/7.32.3',
           'Accept': '*/*',
@@ -314,12 +312,16 @@ app.post('/api/run-test', async (req, res) => {
           });
         }
 
+        // แนบ Custom Request Header เพิ่มเติมเข้าไปในทุก Request ของ Collection
+        if (customHeader && customHeader.name && customHeader.value) {
+          headers[customHeader.name] = customHeader.value;
+        }
+
         let dataBody = null;
         
         if (method !== 'GET' && rawReq.body && rawReq.body.mode === 'raw' && rawReq.body.raw) {
           if (!headers['Content-Type']) headers['Content-Type'] = 'application/json';
           try {
-            // ทำความสะอาด JSON Body ป้องกัน CRLF Injection / บรรทัดใหม่
             const parsed = JSON.parse(rawReq.body.raw);
             dataBody = JSON.stringify(parsed);
           } catch (e) {
@@ -338,9 +340,9 @@ app.post('/api/run-test', async (req, res) => {
 
         const axiosConfig = {
           method: method,
-          url: ipBasedUrl, // ยิงเข้า IP ตรงๆ ตามระบบ Resolve IP
+          url: ipBasedUrl,
           headers: headers,
-          httpsAgent: createCustomHttpsAgent(targetConfig.Domain), // ใช้ Agent ที่ใส่ servername ปกป้อง SNI TLS Handshake
+          httpsAgent: createCustomHttpsAgent(targetConfig.Domain),
           timeout: 15000,
           maxContentLength: Infinity,
           maxBodyLength: Infinity
