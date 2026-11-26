@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function toggleCustomHeader() {
   const isYes = document.getElementById('customHeaderYes')?.checked;
   const inputContainer = document.getElementById('customHeaderInputs');
-  
+
   if (inputContainer) {
     if (isYes) {
       inputContainer.classList.remove('d-none');
@@ -39,7 +39,7 @@ async function handleFileUpload(e) {
 
   try {
     document.getElementById('configSection').classList.add('d-none');
-    
+
     const res = await fetch('/api/validate-collection', { method: 'POST', body: formData });
     const data = await res.json();
 
@@ -75,7 +75,7 @@ function renderFolders(folders) {
         <td class="align-middle text-break">${r.pathUri}</td>
         <td class="text-center align-middle"><span class="badge bg-secondary method-badge">${r.method}</span></td>
         <td class="text-center align-middle">
-          <input class="form-check-input req-loc-${fIdx}" type="radio" name="reqLoc_${fIdx}_${rIdx}" value="On-Premise">
+          <input class="form-check-input req-loc-${fIdx}" type="radio" name="reqLoc_${fIdx}_${rIdx}" value="On-Premise" checked>
         </td>
         <td class="text-center align-middle">
           <input class="form-check-input req-loc-${fIdx}" type="radio" name="reqLoc_${fIdx}_${rIdx}" value="On-Cloud">
@@ -92,9 +92,9 @@ function renderFolders(folders) {
       <div class="card shadow-sm mb-4 border rounded-3 folder-card" data-fidx="${fIdx}">
         <div class="card-body">
           <h4 class="fw-bold mb-3 text-secondary">{${f.folderName}}</h4>
-          
+
           <div class="group-auth p-3 border rounded-3 mb-3 bg-white">
-            
+
             <div class="d-flex align-items-center mb-3">
               <label class="fw-bold form-label mb-0 me-4 text-nowrap" style="width: 160px;">Authentication Type:</label>
               <div class="d-flex gap-4">
@@ -139,7 +139,7 @@ function renderFolders(folders) {
               <label class="fw-bold form-label mb-0 me-4 text-nowrap" style="width: 160px;">Location Authen:</label>
               <div class="d-flex gap-4">
                 <div class="form-check">
-                  <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenPrem_${fIdx}" value="On-Premise">
+                  <input class="form-check-input token-loc" type="radio" name="tokenLoc_${fIdx}" id="tokenPrem_${fIdx}" value="On-Premise" checked>
                   <label class="form-check-label" for="tokenPrem_${fIdx}">On-Premise</label>
                 </div>
                 <div class="form-check">
@@ -165,7 +165,7 @@ function renderFolders(folders) {
                   <th style="width: 130px;">
                     <div class="mb-1 text-muted small">Location<br>(select all)</div>
                     <div class="form-check d-inline-block">
-                      <input class="form-check-input header-select-all" type="radio" name="headerSelectAll_${fIdx}" value="On-Premise" onchange="selectAllLocation(${fIdx}, 'On-Premise')">
+                      <input class="form-check-input header-select-all" type="radio" name="headerSelectAll_${fIdx}" value="On-Premise" checked onchange="selectAllLocation(${fIdx}, 'On-Premise')">
                       <label class="form-check-label fw-bold small">On-Premise</label>
                     </div>
                   </th>
@@ -196,12 +196,13 @@ function renderFolders(folders) {
   });
 
   folders.forEach((_, fIdx) => toggleAuthType(fIdx));
+  validateForm();
 }
 
 function toggleAuthType(fIdx) {
   const card = document.querySelector(`.folder-card[data-fidx="${fIdx}"]`);
   const authType = card.querySelector(`input[name="authType_${fIdx}"]:checked`).value;
-  
+
   const clientId = card.querySelector('.client-id');
   const clientSecret = card.querySelector('.client-secret');
   const btnEye = card.querySelector('.btn-eye');
@@ -213,10 +214,9 @@ function toggleAuthType(fIdx) {
     if (btnEye) btnEye.disabled = false;
     clientId.style.backgroundColor = '';
     clientSecret.style.backgroundColor = '';
-    
+
     apiKey.disabled = true;
     apiKey.style.backgroundColor = '#e9ecef';
-
   } else if (authType === 'API_KEY') {
     clientId.disabled = true;
     clientSecret.disabled = true;
@@ -258,14 +258,13 @@ function selectAllLocation(fIdx, value) {
 
 function validateForm() {
   const btnSubmit = document.getElementById('btnSubmit');
-  
+
   const envSelected = document.querySelector('.env-radio:checked');
   if (!envSelected) {
     btnSubmit.disabled = true;
     return;
   }
 
-  // ตรวจสอบเงื่อนไข Custom Request Header
   const isCustomHeaderYes = document.getElementById('customHeaderYes')?.checked;
   if (isCustomHeaderYes) {
     const hName = document.getElementById('customHeaderName')?.value.trim();
@@ -328,8 +327,7 @@ async function startExecution() {
   summaryFooter.querySelectorAll('button:not(#btnGoToSummary)').forEach(b => b.classList.add('d-none'));
 
   const env = document.querySelector('.env-radio:checked').value;
-  
-  // ดึงค่า Custom Header
+
   let customHeader = null;
   if (document.getElementById('customHeaderYes')?.checked) {
     const hName = document.getElementById('customHeaderName').value.trim();
@@ -363,7 +361,7 @@ async function startExecution() {
       authType: authType,
       clientId: authType === 'OAUTH' ? card.querySelector('.client-id').value.trim() : '',
       clientSecret: authType === 'OAUTH' ? card.querySelector('.client-secret').value.trim() : '',
-      tokenLocation: tokenLocElem ? tokenLocElem.value : '',
+      tokenLocation: tokenLocElem ? tokenLocElem.value : 'On-Premise',
       apiKey: authType === 'API_KEY' ? card.querySelector('.api-key').value.trim() : '',
       requests: requests
     });
@@ -382,13 +380,13 @@ async function startExecution() {
       summaryModal.hide();
     } else {
       executionResults = data.results;
-      
+
       document.getElementById('sumTotal').innerText = data.summary.total;
       document.getElementById('sumSuccess').innerText = data.summary.successCount;
       document.getElementById('sumError').innerText = data.summary.errorCount;
-      
+
       renderTerminalLogs(executionResults);
-      
+
       modalHeader.innerHTML = '<h5 class="modal-title"><i class="bi bi-check-circle-fill me-2"></i>การรัน API เสร็จสมบูรณ์!</h5>';
       summaryModalEl.querySelector('.modal-body').classList.remove('opacity-50');
       modalHeader.classList.remove('bg-primary');
@@ -419,7 +417,7 @@ function renderTerminalLogs(results) {
     const statusText = isSuccess ? 'SUCCESS' : 'ERROR';
 
     let rawResponse = r.responseMsg || '';
-    
+
     try {
       const parsed = JSON.parse(rawResponse);
       rawResponse = JSON.stringify(parsed, null, 2);
@@ -427,7 +425,7 @@ function renderTerminalLogs(results) {
 
     const lines = rawResponse.split('\n');
     let displayResponse = rawResponse;
-    
+
     if (lines.length > 4) {
       displayResponse = lines.slice(0, 4).join('\n') + ' ... [truncated]';
     } else if (rawResponse.length > 500) {
@@ -438,13 +436,13 @@ function renderTerminalLogs(results) {
       <div class="log-item mb-3 pb-2 border-bottom">
         <div class="d-flex justify-content-between">
           <div>
-            <span style="color: ${statusColor}; font-weight: bold;">[${r.no || idx + 1}] ${statusText} (${r.statusCode})</span> : 
-            <span class="text-secondary font-monospace fw-bold method-text">${r.method}</span> 
+            <span style="color: ${statusColor}; font-weight: bold;">[${r.no || idx + 1}] ${statusText} (${r.statusCode})</span> :
+            <span class="text-secondary font-monospace fw-bold method-text">${r.method}</span>
             <span class="text-dark fw-semibold path-text text-break">${r.pathUri}</span>
           </div>
           <div class="text-muted small align-self-center text-nowrap">${r.ip || '-'}</div>
         </div>
-        
+
         <div class="log-details mt-1 pt-1 small text-muted font-monospace">
           System: ${r.system || '-'} | Location Authen: ${r.locationGetToken || '-'} | API Location: ${r.locationApi || '-'}
         </div>
@@ -467,7 +465,7 @@ function downloadCSV() {
   }
 
   const headers = ["No","System","Location Authen","Location API","Method","Path URI","Status code","response masg","Resolve IP","Domain","cURL"];
-  
+
   let csvContent = "\uFEFF";
   csvContent += headers.map(h => `"${h}"`).join(",") + "\n";
 
